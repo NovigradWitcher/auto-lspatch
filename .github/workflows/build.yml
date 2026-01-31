@@ -6,7 +6,7 @@ jobs:
   build-apks:
     runs-on: ubuntu-latest
     env: 
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.PAT }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
