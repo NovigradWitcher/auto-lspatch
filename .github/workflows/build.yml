@@ -101,10 +101,9 @@ jobs:
             git tag "$TAG"
             git push origin "$TAG"
           fi
-      - uses: svenstaro/upload-release-action@v2
+      - uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.brave_version.outputs.tag }}
-          file: release.apk
-          asset_name: release.apk
-          make_latest: true
+          tag: ${{ steps.brave_version.outputs.brave_tag }}
+          artifacts: "release.apk"
+          bodyFile: "Version ${{ steps.brave_version.outputs.brave_tag }}"
 
