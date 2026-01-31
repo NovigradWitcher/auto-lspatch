@@ -6,7 +6,7 @@ jobs:
   build-apks:
     runs-on: ubuntu-latest
     env: 
-      GH_TOKEN: ${{ secrets.PAT }}
+      GH_TOKEN: ${{ github.TOKEN }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -83,8 +83,27 @@ jobs:
       - name: Patch Brave Browser
         run: java -jar lspatch.jar BraveMonoarm64.apk -d -v -m ChromeXt-signed.apk --force --injectdex
       - run: mv BraveMonoarm64-*.apk release.apk
+      - name: Get the latest Brave Browser version
+        id: brave_version
+        run: |
+          LATEST_TAG=$(gh api repos/brave/brave-browser/releases/latest -q '.tag_name')
+          echo "Latest Brave release tag: $LATEST_TAG"
+          echo "brave_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+      - name: Ensure tag exists in this repo
+        run: |
+          TAG="${{ steps.brave_version.outputs.brave_tag }}"
+          echo "Using tag: $TAG"
+          # Check if tag exists remotely
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "Tag $TAG already exists."
+          else
+            echo "Creating tag $TAG pointing to current commit."
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
       - uses: svenstaro/upload-release-action@v2
         with:
+          tag: ${{ steps.brave_version.outputs.tag }}
           file: release.apk
           asset_name: release.apk
           make_latest: true
