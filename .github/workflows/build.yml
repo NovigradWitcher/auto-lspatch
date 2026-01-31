@@ -87,6 +87,5 @@ jobs:
         with:
           file: release.apk
           asset_name: release.apk
-          overwrite: true
           make_latest: true
 
