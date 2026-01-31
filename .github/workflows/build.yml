@@ -105,5 +105,4 @@ jobs:
         with:
           tag: ${{ steps.brave_version.outputs.brave_tag }}
           artifacts: "release.apk"
-          bodyFile: "Version ${{ steps.brave_version.outputs.brave_tag }}"
 
