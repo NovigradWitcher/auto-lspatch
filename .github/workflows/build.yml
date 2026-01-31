@@ -1,0 +1,91 @@
+name: Patch Brave Browser
+
+on: workflow_dispatch
+
+jobs:
+  build-apks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "adopt"
+          java-version: 21
+      - name: Decide Lspatch source
+        id: lspatch_source
+        run: |
+          source scripts/decide_lspatch_source.sh
+          echo "source=$(./scripts/decide_lspatch_source.sh)" >> $GITHUB_OUTPUT
+      - name: Download Lspatch jar from release
+        if: steps.lspatch_source.outputs.source == 'release'
+        uses: robinraju/release-downloader@v1
+        with:
+          repository: JingMatrix/lspatch
+          latest: true
+          fileName: "lspatch.jar"
+      - name: Download LSPatch from workflow artifact
+        if: steps.lspatch_source.outputs.source == 'artifact'
+        run: |
+          OWNER="JingMatrix"
+          REPO="LSPatch"
+          WORKFLOW_FILE="main.yml"
+
+          # Find latest successful run with artifacts
+          RUN_JSON=$(gh api "repos/$OWNER/$REPO/actions/workflows/$WORKFLOW_FILE/runs?per_page=10")
+          RUN_ID=$(echo "$RUN_JSON" | jq -r '.workflow_runs[] | select(.conclusion=="success") | .id' | head -n1)
+          ARTIFACT_ID=$(gh api repos/$OWNER/$REPO/actions/runs/$RUN_ID/artifacts | jq -r '.artifacts[1].id')
+
+          # Download and extract
+          gh api repos/JingMatrix/LSPatch/actions/artifacts/$ARTIFACT_ID/zip > lspatch.zip
+          unzip -q lspatch.zip
+          mv *.jar lspatch.jar
+          rm -f lspatch.zip
+          rm -rf *.apk
+      - name: Decide ChromeXt source
+        id: chromext_source
+        run: |
+          source scripts/decide_chromext_source.sh
+          echo "source=$(./scripts/decide_chromext_source.sh)" >> $GITHUB_OUTPUT
+      - name: Download Chromext APK from release
+        if: steps.chromext_source.outputs.source == 'release'
+        id: download_chromext_release
+        uses: robinraju/release-downloader@v1
+        with:
+          repository: JingMatrix/ChromeXt
+          latest: true
+          fileName: "ChromeXt-signed.apk"
+      - name: Download ChromeXt APK from workflow run
+        if: steps.chromext_source.outputs.source == 'artifact'
+        run: |
+          echo "Downloading ChromeXt APK from workflow artifact"
+          OWNER="JingMatrix"
+          REPO="ChromeXt"
+          WORKFLOW_FILE="android.yml"
+
+          # Find latest successful run with artifact
+          RUN_JSON=$(gh api "repos/$OWNER/$REPO/actions/workflows/$WORKFLOW_FILE/runs?per_page=10")
+          RUN_ID=$(echo "$RUN_JSON" | jq -r '.workflow_runs[] | select(.conclusion=="success") | .id' | head -n1)
+          ARTIFACT_ID=$(gh api repos/$OWNER/$REPO/actions/runs/$RUN_ID/artifacts | jq -r '.artifacts[0].id')
+          gh api repos/$OWNER/$REPO/actions/artifacts/$ARTIFACT_ID/zip > chromext.zip
+
+          # Download and extract
+          unzip -q chromext.zip
+          mv *.apk ChromeXt-signed.apk
+          rm -f chromext.zip
+      - name: Download Brave Browser APK
+        uses: robinraju/release-downloader@v1
+        with:
+          repository: brave/brave-browser
+          latest: true
+          fileName: "BraveMonoarm64.apk"
+      - name: Patch Brave Browser
+        run: java -jar lspatch.jar BraveMonoarm64.apk -d -v -m ChromeXt-signed.apk --force --injectdex
+      - run: mv BraveMonoarm64-*.apk release.apk
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          file: release.apk
+          asset_name: release.apk
+          overwrite: true
+          make_latest: true
+
